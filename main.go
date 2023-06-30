@@ -2,56 +2,52 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"sort"
+	"strconv"
 	"time"
+
+	"github.com/ozx1812/go-mapreduce/mapreduce"
+	"github.com/ozx1812/go-mapreduce/mrapps"
 )
 
-// Basic MapReduce Implementation
-type keyvalue struct    {
-    k, v string
-}
+// for sorting by key
+type ByKey []mapreduce.KeyValue
 
-type MapReduce interface  {
-    mapper(key string, value string) []keyvalue
-    reducer(key string, data []keyvalue) 
-}
+func (a ByKey) Len() int {return len(a)}
+func (a ByKey) Swap(i, j int) {a[i], a[j] = a[j], a[i]}
+func (a ByKey) Less(i, j int) bool {return a[i].Key < a[j].Key}
 
-type WordCount struct {
-    words map[string]int
-}
-
-func (wc WordCount) mapper(key string, value string) []keyvalue {
-    var data []keyvalue
-    words := strings.Split(value, " ") 
-    for _, w := range words {
-        data = append(data, keyvalue{w,"1"})
-    }
-    return data
-}
-
-func (wc WordCount) reducer(key string, data []keyvalue) {
-    for _, w := range data {
-        if wc.words[w.k] == 0 {
-            wc.words[w.k] = 1
-        }else {
-            wc.words[w.k] += 1
-        }
-    }
-}
 
 func main()  {
-    start := time.Now()
-    fmt.Println("Hello main...")
-    var wc WordCount
-    wc.words = make(map[string]int)
-    text := "hello hello how how how are are you you you"
+    text := "Apple Banana Banana Cat Cat Cat "
     for i := 0; i < 20; i++ {
+        fmt.Printf("\n------\nIteration i: %v\n", i)
+        start := time.Now()
         text += text
-    }
-    data := wc.mapper("1", text)
-    wc.reducer("1", data)
-    fmt.Println(wc.words)
-    elapsed := time.Since(start)
-    fmt.Printf("time : %s", elapsed)
+        var wc mrapps.WordCount
+        intermediate := []mapreduce.KeyValue{}
+        kva := wc.Map(strconv.Itoa(i+1), text)
+        intermediate = append(intermediate, kva...)
 
+        // Sort by Key
+        sort.Sort(ByKey(intermediate))
+    
+        // Reduce on distinct keys
+        i := 0
+        for i < len(intermediate) {
+            j := i + 1
+            for j < len(intermediate) && intermediate[j].Key == intermediate[i].Key {
+                j++
+            }
+            values := []string{}
+            for k := i; k<j; k++{
+                values = append(values, intermediate[k].Value)
+            }
+            output := wc.Reduce(intermediate[i].Key, values)
+            fmt.Printf("%v %v\n", intermediate[i].Key, output)
+            i = j
+        }
+        elapsed := time.Since(start)
+        fmt.Printf("Time : %s", elapsed)
+    }
 }
