@@ -1,4 +1,4 @@
-# go-distributed
+# kv-raft
 
 - mapreduce
   - word-count
